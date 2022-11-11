@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+
+    <title>3DX World Name Hider</title>
+    <script type="application/javascript">
+
+        const heightDiff = -150;
+
+        function download(filename, text) {
+            var element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            element.setAttribute('download', filename);
+
+            element.style.display = 'none';
+            document.body.appendChild(element);
+
+            element.click();
+
+            document.body.removeChild(element);
+        }
+
+        function showError(err) {
+            document.getElementById('error').innerHTML = err;
+        }
+
+        function parseContentToJson(content) {
+            try {
+                return JSON.parse(content);
+            } catch (e) {
+                showError("Failed to process worldfile")
+            }
+        }
+
+        function moveContentBelowSeaLevel(worldContent) {
+            console.log({worldContent});
+            worldContent.oceanlevel = worldContent.oceanlevel + heightDiff;
+            moveObjectBelowSeaLevel(worldContent);
+            return worldContent;
+        }
+
+        function moveObjectBelowSeaLevel(worldObject) {
+		    if (worldObject.respawn && worldObject.respawn.p) {
+				worldObject.respawn.p[1] = worldObject.respawn.p[1] + heightDiff;
+			}
+            // In hopes that groups always have an 'objects' property
+            if (worldObject.objects) {
+                worldObject.objects.forEach(object => moveObjectBelowSeaLevel(object));
+            }
+            // If there is a position, position is adjusted by height diff
+            if (worldObject.p) {
+                worldObject.p[1] = worldObject.p[1] + heightDiff // p = position, 0 = x, 1 = y, 2 = z;
+            }
+        }
+
+        function downloadAsWorldFile(worldContent, originalFilename) {
+            download(originalFilename + '_without-names.world', worldContent);
+        }
+
+        function processWorldFile(event) {
+            showError('');
+            if (event.target && event.target.files) {
+                const files = event.target.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    file.text()
+                        .then(value => parseContentToJson(value))
+                        .then(value => moveContentBelowSeaLevel(value))
+                        .then(value => downloadAsWorldFile(JSON.stringify(value), file.name.split('.')[0]));
+                }
+            }
+
+        }
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById('input-worldfile').addEventListener('change', processWorldFile, false);
+        });
+    </script>
+</head>
+<body>
+    <h3 id="error"></h3>
+    <div class="card-panel blue-grey lighten-3" style="max-width: 800px">
+        <h3>Name Hider / World Mover</h3>
+        <p>
+            Moves your whole world 150 meters below sea level, effectively hiding all names
+        </p>
+        <div>Instructions</div>
+        <ol>
+            <li>Select a .world file</li>
+            <li>If the file is valid, a save-to-file dialog will open</li>
+            <li>Save the new .world file</li>
+            <li>Done</li>
+        </ol>
+        <blockquote>
+            Only works for .world files saved on newer game versions. If you downloaded an old map, load it once ingame and then save it again.
+        </blockquote>
+        <input type="file" id="input-worldfile" name="worldfile" onchange="processWorldFile(this)">
+    </div>
+</body>
+</html>
